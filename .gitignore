@@ -1,0 +1,88 @@
+
+# ==========================================
+# Keil MDK / ARM Compiler
+# ==========================================
+
+# Build outputs
+*.axf
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.o
+*.obj
+*.d
+*.crf
+*.dep
+*.lnp
+*.plg
+*.tra
+*.htm
+*.sct.bak
+
+# Keil generated folders
+Objects/
+Listings/
+DebugConfig/
+*.uvguix.*
+*.uvgui.*
+*.uvopt
+*.uvoptx
+*.uvgui
+*.uvgui.*
+
+# ==========================================
+# ARM Compiler / Debug
+# ==========================================
+
+*.iex
+*.iex*
+*.bak
+*.orig
+*.tmp
+*.log
+
+# ==========================================
+# CMake / MicroOS build
+# ==========================================
+
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+compile_commands.json
+Testing/
+
+# ==========================================
+# Visual Studio / VS Code
+# ==========================================
+
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# ==========================================
+# OS temporary files
+# ==========================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# ==========================================
+# Temporary files
+# ==========================================
+
+*.temp
+*.orig
+*.rej

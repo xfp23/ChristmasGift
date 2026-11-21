@@ -1,0 +1,449 @@
+#ifndef MICROOS_H
+#define MICROOS_H
+
+/**
+ * @file MicroOS.h
+ * @author (https://xfp23.github.io)
+ * @brief Lightweight cooperative scheduler and event manager for embedded systems.
+ *
+ * @note
+ *   - Single-instance design: all tasks and events run in the same MicroOS instance.
+ *   - Each task has a unique ID, which can also represent task priority (lower ID = higher priority).
+ *   - The maximum number of tasks is defined by MICROOS_TASK_SIZE (default: 10).
+ *   - Static allocation only; no dynamic stack allocation to avoid heap fragmentation in resource-limited MCUs.
+ *   - Event system uses a fixed pool defined by OS_EVENT_POOLSIZE.
+ *   - Tick-driven scheduler: call MicroOS_TickHandler() from a periodic hardware timer ISR.
+ *   - To speed up scheduling accuracy, ensure MICROOS_FREQ_HZ matches the hardware tick frequency.
+ *   - OSdelay uses a static delay task pool; modify OS_DELAY_POOLSIZE to adjust pool size.
+ *
+ * @version \ref MICROOS_VERSION
+ * @date 2025-08-03
+ * @copyright Copyright (c) 2025
+ */
+
+#include "MicroOS_types.h"
+#include "MicroOSQueue.h"
+#include "MicroOS_utils.h"
+#include "MicroOS_conf.h"
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+/**
+ * @brief Initialize the MicroOS instance
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_Init(void);
+
+/**
+ * @brief Registers a new event or updates an existing one.
+ *
+ * @param id            Unique event identifier.
+ * @param name          Event name
+ * @param EventFunction Callback function to be executed when the event is triggered.
+ * @param Userdata User data pointer
+ * @return MicroOS_Status_t Returns MICROOS_OK on success or an error code if the event pool is full.
+ */
+extern MicroOS_Status_t MicroOS_RegisterEvent(uint8_t id, const char *name, MicroOS_EventFunction_t EventFunction, const void *Userdata);
+
+/**
+ * @brief Deletes an event from the active event list.
+ *
+ * @param id Unique event identifier to be deleted.
+ */
+extern void MicroOS_DeleteEvent(uint8_t id);
+
+/**
+ * @brief Triggers an event, marking it to be executed in the scheduler loop.
+ *
+ * @param id Unique event identifier to trigger.
+ * @param Userdata      Pointer to user-defined data passed to the callback function.
+ * @return MicroOS_Status_t Returns MICROOS_OK if the event was found and triggered, otherwise MICROOS_ERROR.
+ */
+extern MicroOS_Status_t MicroOS_TriggerEvent(uint8_t id);
+
+/**
+ * @brief Suspends an event, preventing it from being executed even if triggered.
+ *
+ * @param id Unique event identifier to suspend.
+ * @return MicroOS_Status_t Returns MICROOS_OK if the event was found and suspended, otherwise MICROOS_ERROR.
+ */
+extern MicroOS_Status_t MicroOS_SuspendEvent(uint8_t id);
+
+/**
+ * @brief Resumes a previously suspended event, allowing it to execute when triggered.
+ *
+ * @param id Unique event identifier to resume.
+ * @return MicroOS_Status_t Returns MICROOS_OK if the event was found and resumed, otherwise MICROOS_ERROR.
+ */
+extern MicroOS_Status_t MicroOS_ResumeEvent(uint8_t id);
+
+/**
+ * @brief blocking delay
+ *
+ * @param Ticks Ticks Delay Ticks num  OS_MS_TICKS(ms)
+ * @return MicroOS_Status_t  Status code
+ */
+extern MicroOS_Status_t MicroOS_delay(uint32_t Ticks);
+
+/**
+ * @brief Set a delay for a task (OSdelay)
+ * @param OSdelayFunction  Delayed callback function
+ * @param Userdata Data pointer provided by the user
+ * @param Ticks Delay Ticks num  OS_MS_TICKS(ms)
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_OSdelay(MicroOS_OSdelayFunction_t OSdelayFunction, const void *Userdata, uint32_t Ticks);
+
+// /**
+//  * @brief Remove or cancel a scheduled delay in advance. (Deprecated)
+//  *
+//  * @param id OSdelay ID
+//  */
+// extern void MicroOS_OSdelay_Remove(uint8_t id);
+
+/**
+ * @brief Add a task to the scheduler
+ * @param id Task ID (also represents priority; must be unique and less than MICROOS_TASK_SIZE)
+ * @param Taskname Task name
+ * @param TaskFunction Pointer to the task function
+ * @param Userdata Pointer to user data
+ * @param Period Task period in milliseconds
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_AddTask(uint8_t id, const char *Taskname, MicroOS_TaskFunction_t TaskFunction, void *Userdata, uint32_t Ticks);
+
+/**
+ * @brief Start the MicroOS scheduler and begin running tasks
+ */
+extern void MicroOS_StartScheduler(void);
+
+/**
+ * @brief Tick handler, usually called in the system clock interrupt
+ * @note This function increases the TickCount counter, which is used for task scheduling. Typically called in a 1ms timer interrupt.
+ */
+extern void MicroOS_TickHandler(void);
+
+/**
+ * @brief Get MicroOS Tick count
+ *
+ * @return uint32_t Tick count
+ */
+extern uint32_t MicroOS_GetTick(void);
+
+/**
+ * @brief Suspend the task with the specified ID
+ * @param id Task ID
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_SuspendTask(uint8_t id);
+
+/**
+ * @brief Resume the task with the specified ID
+ * @param id Task ID
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_ResumeTask(uint8_t id);
+
+/**
+ * @brief
+ * Task sleep, set the task not to run within the specified time
+ *
+ * @param id
+ * @param Ticks Sleep Ticks OS_MS_TICKS(ms)
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_SleepTask(uint8_t id, uint32_t Ticks);
+
+/**
+ * @brief Wake up the task in advance, used in conjunction with sleep
+ *
+ * @param id task id
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_WakeupTask(uint8_t id);
+
+/**
+ * @brief Rest the task record Ticks
+ *
+ * @param id task id
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_ResetTask(uint8_t id);
+
+/**
+ * @brief Delete the task with the specified ID
+ * @param id Task ID
+ * @return MicroOS_Status_t Status code
+ */
+extern MicroOS_Status_t MicroOS_DeleteTask(uint8_t id);
+
+#if MICROOS_MESSAGEEVENT_ENABLE
+extern MicroOS_Status_t MicroOS_RegisterMessageEvent(uint8_t id, const char *name, MicroOSQueue_EventFunction_t function, uint32_t depth, uint32_t single_size);
+#if MICROOS_USE_MEM
+#else
+/**
+ * @brief Registers a new Message event or updates an existing one.
+ *
+ * @param id Message Event id
+ * @param name Message Event ASCII name
+ * @param function
+ * @return MicroOS_Status_t
+ */
+extern MicroOS_Status_t MicroOS_RegisterMessageEvent(uint8_t id, const char *name, MicroOSQueue_EventFunction_t function);
+#endif
+
+#if !MICROOS_USE_MEM
+/**
+ * @brief Delete the task with the specified ID
+ *
+ * @param id Message Event id
+ * @return MicroOS_Status_t
+ */
+extern MicroOS_Status_t MicroOS_DeleteMessageEvent(uint8_t id);
+#endif
+
+
+/**
+ * @brief Triggers an Message Event event, marking it to be executed in the scheduler loop.
+ *
+ * @param id Message Event id
+ * @param data Queue data
+ * @param data_len data len
+ * @return MicroOS_Status_t
+ */
+extern MicroOS_Status_t MicroOS_TriggerMessageEvent(uint8_t id, const void *data, size_t data_len);
+
+/**
+ * @brief Suspends an Message event, preventing it from being executed even if triggered.
+ *
+ * @param id Message Event id
+ * @return MicroOS_Status_t
+ */
+extern MicroOS_Status_t MicroOS_SuspendMessageEvent(uint8_t id);
+
+/**
+ * @brief Resumes a previously suspended  Message event, allowing it to execute when triggered.
+ *
+ * @param id Message Event id
+ * @return MicroOS_Status_t
+ */
+extern MicroOS_Status_t MicroOS_ResumeMessageEvent(uint8_t id);
+
+/**
+ * @brief Get the Message Event Size for ID
+ * 
+ * @param id Message Event ID
+ * @return uint32_t 
+ */
+extern uint32_t MicroOS_GetSizeMessageEvent(uint8_t id);
+#endif
+
+#if MICROOS_SUBSCRIPTION_ENABLE
+/**
+ * @brief Register a new publish topic.
+ *
+ * Create a topic with the specified ID and name. The topic ID must be unique.
+ *
+ * @param id Topic identifier.
+ * @param topic Topic name.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_CreateTopic(uint8_t id, const char *topic);
+
+/**
+ * @brief Delete a publish topic.
+ *
+ * Delete the specified topic and remove all associated subscriptions.
+ *
+ * @param id Topic identifier.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_DeleteTopic(uint8_t id);
+
+/**
+ * @brief Subscribe to a topic.
+ *
+ * Register a subscriber callback for the specified topic.
+ *
+ * @param topic_id Topic identifier.
+ * @param sub_id Subscriber identifier.
+ * @param name Subscriber name.
+ * @param func Subscriber callback function.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_Subscribe(uint8_t topic_id,uint8_t sub_id,const char *name,MicroOS_SubscriberFunction_t func);
+
+/**
+ * @brief Unsubscribe from a topic.
+ *
+ * Remove the specified subscriber from the topic.
+ *
+ * @param topic_id Topic identifier.
+ * @param sub_id Subscriber identifier.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_Unsubscribe(uint8_t topic_id, uint8_t sub_id);
+
+/**
+ * @brief Publish data to a topic.
+ *
+ * Invoke all active subscriber callbacks registered to the topic.
+ *
+ * @param topic_id Topic identifier.
+ * @param Userdata Pointer to user-defined data.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_Publish(uint8_t topic_id, const void *Userdata);
+
+/**
+ * @brief Suspend a subscriber.
+ *
+ * Suspend the specified subscriber without removing it from the topic.
+ *
+ * @param topic_id Topic identifier.
+ * @param sub_id Subscriber identifier.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_SuspendSubscription(uint8_t topic_id, uint8_t sub_id);
+
+/**
+ * @brief Resume a suspended subscriber.
+ *
+ * Resume callback execution for the specified subscriber.
+ *
+ * @param topic_id Topic identifier.
+ * @param sub_id Subscriber identifier.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_ResumeSubscription(uint8_t topic_id, uint8_t sub_id);
+
+/**
+ * @brief Remove all subscribers from a topic.
+ *
+ * The topic remains valid after this operation.
+ *
+ * @param topic_id Topic identifier.
+ * @return MicroOS_Status_t Operation result.
+ */
+extern MicroOS_Status_t MicroOS_ClearSubscriptions(uint8_t topic_id);
+
+/**
+ * @brief Get the number of subscribers of a topic.
+ *
+ * @param topic_id Topic identifier.
+ * @return uint8_t Number of registered subscribers.
+ */
+extern uint8_t MicroOS_SubscriberCount(uint8_t topic_id);
+
+/**
+ * @brief Check whether a topic is suspended.
+ *
+ * @param topic_id Topic identifier.
+ * @return true Topic is suspended.
+ * @return false Topic is active.
+ */
+extern bool MicroOS_IsTopicSuspended(uint8_t topic_id);
+
+/**
+ * @brief Check whether a subscriber is suspended.
+ *
+ * @param topic_id Topic identifier.
+ * @param sub_id Subscriber identifier.
+ * @return true Subscriber is suspended.
+ * @return false Subscriber is active.
+ */
+extern bool MicroOS_IsSubscriptionSuspended(uint8_t topic_id, uint8_t sub_id);
+#endif
+
+/**
+ * @brief Create (configure) an OS timer. The timer is NOT started automatically;
+ *        call MicroOS_OSTimer_Start() to run it.
+ *
+ * @note  The callback is executed from the hardware timer ISR context, so it must be
+ *        short and non-blocking (no delays, no blocking mutexes, no printf-style calls).
+ * @note  Calling Create on an ID that is already in use overwrites its configuration.
+ *        Stop or Delete the timer first to avoid undefined behavior.
+ *
+ * @param id             Timer ID, must be less than MICROOS_OSTIMER_SIZE.
+ * @param timerFunction  Callback invoked when the timer expires. Must not be NULL.
+ * @param period         Timer period in OS timer ticks (the tick length is determined by
+ *                       the hardware timer that drives the dispatcher). Must be > 0.
+ *                       The macro `OS_MS_TICK` from `MicroOS_untils.h` is recommended.
+ * @param is_auto_reload true  - periodic mode: the timer restarts automatically after each expiry.
+ *                       false - one-shot mode: the timer stops after the first expiry.
+ * @param args           User argument passed to the callback on each expiry. May be NULL.
+ *
+ * @return MicroOS_Status_t
+ * @retval MICROOS_OK             Timer created successfully.
+ * @retval MICROOS_INVALID_PARAM  period is 0.
+ * @retval Other error codes      Invalid ID or NULL callback (as reported by the check macros).
+ */
+extern MicroOS_Status_t MicroOS_OSTimer_Create(uint8_t id, MicroOS_TimerFunction_t timerFunction, uint32_t period, bool is_auto_reload, void *args);
+
+/**
+ * @brief Delete an OS timer. The timer is stopped and its configuration (callback,
+ *        period, arguments, flags) is cleared. The ID can be reused by MicroOS_OSTimer_Create().
+ *
+ * @note  Deleting a timer that was never created, or was already deleted, is harmless
+ *        (idempotent) and returns MICROOS_OK.
+ *
+ * @param id  Timer ID, must be less than MICROOS_OSTIMER_SIZE.
+ *
+ * @return MicroOS_Status_t
+ * @retval MICROOS_OK         Timer deleted successfully.
+ * @retval Other error codes  Invalid ID.
+ */
+extern MicroOS_Status_t MicroOS_OSTimer_Delete(uint8_t id);
+
+/**
+ * @brief Start an OS timer. The tick counter is reset to 0, so counting always begins
+ *        from a full period.
+ *
+ * @note  If the timer is already running, it is restarted from zero.
+ * @note  The timer must have been created with MicroOS_OSTimer_Create() first.
+ *
+ * @param id  Timer ID, must be less than MICROOS_OSTIMER_SIZE.
+ *
+ * @return MicroOS_Status_t
+ * @retval MICROOS_OK         Timer started successfully.
+ * @retval Other error codes  Invalid ID, or the timer has not been created.
+ */
+extern MicroOS_Status_t MicroOS_OSTimer_Start(uint8_t id);
+
+/**
+ * @brief Stop an OS timer and reset its tick counter to 0. The timer remains created and
+ *        can be started again with MicroOS_OSTimer_Start() without calling Create again.
+ *
+ * @note  The elapsed time is discarded; a later Start begins from a full period (no pause/resume).
+ *
+ * @param id  Timer ID, must be less than MICROOS_OSTIMER_SIZE.
+ *
+ * @return MicroOS_Status_t
+ * @retval MICROOS_OK         Timer stopped successfully.
+ * @retval Other error codes  Invalid ID, or the timer has not been created.
+ */
+extern MicroOS_Status_t MicroOS_OSTimer_Stop(uint8_t id);
+
+/**
+ * @brief Manually reload an OS timer by resetting its tick counter to 0, restarting the
+ *        current period without changing the running state. Typically used as a
+ *        "watchdog-style" feed to postpone expiry.
+ *
+ * @note  This does not start a stopped timer; use MicroOS_OSTimer_Start() for that.
+ *
+ * @param id  Timer ID, must be less than MICROOS_OSTIMER_SIZE.
+ *
+ * @return MicroOS_Status_t
+ * @retval MICROOS_OK         Tick counter reset successfully.
+ * @retval Other error codes  Invalid ID.
+ */
+extern MicroOS_Status_t MicroOS_OSTimer_Reload(uint8_t id);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // !MICROOS_H
